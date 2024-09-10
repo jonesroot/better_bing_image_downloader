@@ -8,7 +8,6 @@ from .bing import Bing
 import httpx
 
 
-
 async def downloader(
     query,
     limit=5,
@@ -46,6 +45,9 @@ async def downloader(
         total_downloaded = 0
 
         async for url in bing.get_image_urls():
+            if total_downloaded >= limit:
+                break
+            
             try:
                 response = await client.get(url)
                 if response.status_code == 200:
