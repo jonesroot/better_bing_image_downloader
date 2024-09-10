@@ -9,66 +9,58 @@ import asyncio
 import httpx
 
 
-async def downloader(query: str, limit: int, output_dir: str = 'downloads', adult_filter_off: bool = False,
-                     force_replace: bool = False, timeout: int = 60, filter: str = "", verbose: bool = True,
-                     badsites: list = [], name: str = 'Image'):
+async def downloader(
+    query,
+    limit=5,
+    output_dir='downloads',
+    adult_filter_off=False,
+    force_replace=False,
+    timeout=60,
+    filter="",
+    verbose=False,
+    badsites=[],
+    name='Image'
+):
     """
-    Download images using the Bing image scraper asynchronously.
-    
-    Parameters:
-    query (str): The search query.
-    limit (int): The maximum number of images to download.
-    output_dir (str): The directory to save the images in.
-    adult_filter_off (bool): Whether to turn off the adult filter.
-    force_replace (bool): Whether to replace existing files.
-    timeout (int): The timeout for the image download.
-    filter (str): The filter to apply to the search results.
-    verbose (bool): Whether to print detailed output.
-    badsites (list): List of bad sites to be excluded.
-    name (str): The name of the images.
+    Asynchronous downloader using httpx and tqdm for progress reporting.
     """
 
-    if verbose:
-        logging.basicConfig(level=logging.INFO)
+    if adult_filter_off:
+        adult = 'off'
     else:
-        logging.basicConfig(level=logging.CRITICAL)
+        adult = 'on'
 
-    adult = 'off' if adult_filter_off else 'on'
+    image_dir = os.path.join(output_dir, query)
 
-    image_dir = Path(output_dir).joinpath(query).absolute()
-
-    if force_replace and image_dir.is_dir():
+    if force_replace and os.path.isdir(image_dir):
         shutil.rmtree(image_dir)
 
-    try:
-        if not image_dir.is_dir():
-            image_dir.mkdir(parents=True)
-    except Exception as e:
-        logging.error('Failed to create directory. %s', e)
-        sys.exit(1)
-        
-    logging.info("Downloading Images to %s", str(image_dir.absolute()))
+    if not os.path.isdir(image_dir):
+        os.makedirs(image_dir)
 
-    async with httpx.AsyncClient(timeout=timeout) as client, tqdm(total=limit, unit='MB', ncols=100, colour="green",
-                                                                  bar_format='{l_bar}{bar} {total_fmt} MB | '
-                                                                             'Download Speed {rate_fmt} | '
-                                                                             'Estimated Time: {remaining}') as pbar:
-        def update_progress_bar(download_count):
-            pbar.update(download_count - pbar.n)
+    if verbose:
+        print(f"Downloading images to {image_dir}")
 
+    async with httpx.AsyncClient(timeout=timeout) as client:
         bing = Bing(query, limit, image_dir, adult, timeout, filter, verbose, badsites, name)
-        bing.download_callback = update_progress_bar
+        total_downloaded = 0
+        with tqdm(total=limit, unit='MB', ncols=100, colour="green",
+                  bar_format='{l_bar}{bar} {n_fmt}/{total_fmt} | Download Speed: {rate_fmt} | Time left: {remaining}') as pbar:
+            async for url in bing.get_image_urls():
+                try:
+                    response = await client.get(url)
+                    if response.status_code == 200:
+                        file_path = os.path.join(image_dir, f"{name}_{total_downloaded}.jpg")
+                        with open(file_path, 'wb') as f:
+                            f.write(response.content)
+                        total_downloaded += 1
+                        pbar.update(1)
+                except Exception as e:
+                    if verbose:
+                        print(f"Failed to download {url}: {e}")
 
-        await bing.run(client)
-
-    source_input = input('\n\nDo you wish to see the image sources? (Y/N): ')
-    if source_input.lower() == 'y':
-        i = 1
-        for src in bing.seen:
-            print(f'{str(i)}. {src}')
-            i += 1
-    else:
-        print('Happy Scraping!')
+    if verbose:
+        print(f"Download completed: {total_downloaded} images downloaded.")
 
 
 if __name__ == '__main__':
