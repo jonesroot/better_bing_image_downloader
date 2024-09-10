@@ -5,12 +5,15 @@ import logging
 from pathlib import Path
 from .bing import Bing
 from tqdm import tqdm
-from math import ceil
+import asyncio
+import httpx
 
-def downloader(query, limit= int, output_dir='downloads', adult_filter_off=False,
-               force_replace=False, timeout=60, filter="", verbose= str, badsites=[], name='Image'):
+
+async def downloader(query: str, limit: int, output_dir: str = 'downloads', adult_filter_off: bool = False,
+                     force_replace: bool = False, timeout: int = 60, filter: str = "", verbose: bool = True,
+                     badsites: list = [], name: str = 'Image'):
     """
-    Download images using the Bing image scraper.
+    Download images using the Bing image scraper asynchronously.
     
     Parameters:
     query (str): The search query.
@@ -25,16 +28,17 @@ def downloader(query, limit= int, output_dir='downloads', adult_filter_off=False
     name (str): The name of the images.
     """
 
-    if adult_filter_off:
-        adult = 'off'
+    if verbose:
+        logging.basicConfig(level=logging.INFO)
     else:
-        adult = 'on'
+        logging.basicConfig(level=logging.CRITICAL)
+
+    adult = 'off' if adult_filter_off else 'on'
 
     image_dir = Path(output_dir).joinpath(query).absolute()
 
-    if force_replace:
-        if image_dir.is_dir():
-            shutil.rmtree(image_dir)
+    if force_replace and image_dir.is_dir():
+        shutil.rmtree(image_dir)
 
     try:
         if not image_dir.is_dir():
@@ -45,14 +49,17 @@ def downloader(query, limit= int, output_dir='downloads', adult_filter_off=False
         
     logging.info("Downloading Images to %s", str(image_dir.absolute()))
 
-    with tqdm(total=limit, unit='MB', ncols=100, colour="green",
-              bar_format='{l_bar}{bar} {total_fmt} MB| Download Speed {rate_fmt} | Estimated Time:  {remaining}') as pbar:
+    async with httpx.AsyncClient(timeout=timeout) as client, tqdm(total=limit, unit='MB', ncols=100, colour="green",
+                                                                  bar_format='{l_bar}{bar} {total_fmt} MB | '
+                                                                             'Download Speed {rate_fmt} | '
+                                                                             'Estimated Time: {remaining}') as pbar:
         def update_progress_bar(download_count):
             pbar.update(download_count - pbar.n)
 
         bing = Bing(query, limit, image_dir, adult, timeout, filter, verbose, badsites, name)
         bing.download_callback = update_progress_bar
-        bing.run()
+
+        await bing.run(client)
 
     source_input = input('\n\nDo you wish to see the image sources? (Y/N): ')
     if source_input.lower() == 'y':
@@ -62,7 +69,7 @@ def downloader(query, limit= int, output_dir='downloads', adult_filter_off=False
             i += 1
     else:
         print('Happy Scraping!')
-    
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Download images using Bing.')
@@ -79,5 +86,5 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
-    downloader(args.query, args.limit, args.output_dir, args.adult_filter_off, 
-               args.force_replace, args.timeout, args.filter, args.verbose, args.bad_sites, args.name)
+    asyncio.run(downloader(args.query, args.limit, args.output_dir, args.adult_filter_off,
+                           args.force_replace, args.timeout, args.filter, args.verbose, args.bad_sites, args.name))
