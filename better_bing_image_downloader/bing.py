@@ -1,10 +1,14 @@
 import urllib.request
 import urllib
 import logging
+import asyncio
+import aiohttp
 import imghdr
 import posixpath
 import re
 from pathlib import Path
+from PIL import Image
+from io import BytesIO
 
 
 class Bing:
@@ -62,9 +66,13 @@ class Bing:
         try:
             request = urllib.request.Request(link, None, self.headers)
             image = urllib.request.urlopen(request, timeout=self.timeout).read()
-            if not imghdr.what(None, image):
-                logging.error('Invalid image, not saving %s', link)
+            try:
+                with Image.open(BytesIO(image)) as img:
+                    img.verify()
+            except (IOError, SyntaxError) as e:
+                logging.error('Invalid image, not saving %s: %s', link, e)
                 raise ValueError('Invalid image, not saving %s' % link)
+
             with open(str(file_path), 'wb') as f:
                 f.write(image)
 
@@ -73,6 +81,7 @@ class Bing:
 
         except urllib.error.URLError as e:
             logging.error('URLError while saving image %s: %s', link, e)
+        
 
     def download_image(self, link):
         if self.download_count >= self.limit:
@@ -115,13 +124,17 @@ class Bing:
                     + '&adlt=' + self.adult
                     + '&qft=' + ('' if self.filter is None else self.get_filter(self.filter))
                 )
-                request = urllib.request.Request(request_url, None, headers=self.headers)
-                response = urllib.request.urlopen(request)
-                html = response.read().decode('utf8')
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(request_url, headers=self.headers) as response:
+                        html = await response.text()
+
                 if html == "":
                     logging.info("[%] No more images are available")
                     break
+                
                 links = re.findall('murl&quot;:&quot;(.*?)&quot;', html)
+                
                 if self.verbose:
                     logging.info("[%%] Indexed %d Images on Page %d.", len(links), self.page_counter + 1)
                     logging.info("\n===============================================\n")
@@ -134,12 +147,11 @@ class Bing:
 
                     if self.download_count < self.limit and link not in self.seen:
                         self.seen.add(link)
-                        self.download_image(link)
+                        yield link
 
                 self.page_counter += 1
-            except urllib.error.HTTPError as e:
-                logging.error('HTTPError while making request to Bing: %s', e)
-            except urllib.error.URLError as e:
-                logging.error('URLError while making request to Bing: %s', e)
+                await asyncio.sleep(1)
+            except aiohttp.ClientError as e:
+                logging.error('ClientError while making request to Bing: %s', e)
 
         logging.info("\n\n[%%] Done. Downloaded %d images.", self.download_count)
