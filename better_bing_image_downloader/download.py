@@ -1,13 +1,12 @@
-import sys
-import shutil
+import os
 import argparse
+import shutil
+import asyncio
 import logging
 from pathlib import Path
 from .bing import Bing
-from tqdm import tqdm
-import asyncio
+from tqdm.asyncio import tqdm
 import httpx
-
 
 async def downloader(
     query,
@@ -44,8 +43,9 @@ async def downloader(
     async with httpx.AsyncClient(timeout=timeout) as client:
         bing = Bing(query, limit, image_dir, adult, timeout, filter, verbose, badsites, name)
         total_downloaded = 0
-        with tqdm(total=limit, unit='MB', ncols=100, colour="green",
-                  bar_format='{l_bar}{bar} {n_fmt}/{total_fmt} | Download Speed: {rate_fmt} | Time left: {remaining}') as pbar:
+
+        async with tqdm(total=limit, unit='MB', ncols=100, colour="green",
+                        bar_format='{l_bar}{bar} {n_fmt}/{total_fmt} | Download Speed: {rate_fmt} | Time left: {remaining}') as pbar:
             async for url in bing.get_image_urls():
                 try:
                     response = await client.get(url)
