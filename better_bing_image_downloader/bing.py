@@ -97,7 +97,7 @@ class Bing:
             self.download_count -= 1
             logging.error('Issue getting: %s\nError: %s', link, e)
 
-    def run(self):
+    async def get_image_urls(self):
         while self.download_count < self.limit:
             if self.verbose:
                 logging.info('\n\n[!] Indexing page: %d\n', self.page_counter + 1)
@@ -130,7 +130,7 @@ class Bing:
 
                     if self.download_count < self.limit and link not in self.seen:
                         self.seen.add(link)
-                        self.download_image(link)
+                        yield link  # Yield URL for async iteration
 
                 self.page_counter += 1
             except urllib.error.HTTPError as e:
