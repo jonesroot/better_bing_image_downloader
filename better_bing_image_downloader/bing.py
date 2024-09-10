@@ -1,26 +1,16 @@
-from pathlib import Path
 import urllib.request
 import urllib
+import logging
 import imghdr
 import posixpath
 import re
-import logging
-from tqdm import tqdm
-
-'''
-
-Python api to download image form Bing.
-Origina Author: Guru Prasad (g.gaurav541@gmail.com)
-Improved Author: Krishnatejaswi S (shentharkrishnatejaswi@gmail.com) 
-
-'''
-
+from pathlib import Path
 
 class Bing:
     def __init__(self, query, limit, output_dir, adult, timeout, filter='', verbose=False, badsites=[], name='Image'):
         self.download_count = 0
         self.query = query
-        self.output_dir = output_dir
+        self.output_dir = Path(output_dir)  # Ensure Path object
         self.adult = adult
         self.filter = filter
         self.verbose = verbose
@@ -34,7 +24,7 @@ class Bing:
             logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
         else:
             logging.basicConfig(level=logging.ERROR, format='%(levelname)s: %(message)s')
-        
+
         if self.badsites:
             logging.info("Download links will not include: %s", ', '.join(self.badsites))
 
@@ -44,46 +34,43 @@ class Bing:
         self.timeout = timeout
 
         self.page_counter = 0
-        self.headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) ' 
-            'AppleWebKit/537.11 (KHTML, like Gecko) '
-            'Chrome/23.0.1271.64 Safari/537.11',
+        self.headers = {
+            'User-Agent': ('Mozilla/5.0 (X11; Linux x86_64) '
+                           'AppleWebKit/537.11 (KHTML, like Gecko) '
+                           'Chrome/23.0.1271.64 Safari/537.11'),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
             'Accept-Encoding': 'none',
             'Accept-Language': 'en-US,en;q=0.8',
-            'Connection': 'keep-alive'}
+            'Connection': 'keep-alive'
+        }
 
     def get_filter(self, shorthand):
-        if shorthand == "line" or shorthand == "linedrawing":
-            return "+filterui:photo-linedrawing"
-        elif shorthand == "photo":
-            return "+filterui:photo-photo"
-        elif shorthand == "clipart":
-            return "+filterui:photo-clipart"
-        elif shorthand == "gif" or shorthand == "animatedgif":
-            return "+filterui:photo-animatedgif"
-        elif shorthand == "transparent":
-            return "+filterui:photo-transparent"
-        else:
-            return ""
+        filters = {
+            "line": "+filterui:photo-linedrawing",
+            "linedrawing": "+filterui:photo-linedrawing",
+            "photo": "+filterui:photo-photo",
+            "clipart": "+filterui:photo-clipart",
+            "gif": "+filterui:photo-animatedgif",
+            "animatedgif": "+filterui:photo-animatedgif",
+            "transparent": "+filterui:photo-transparent"
+        }
+        return filters.get(shorthand, "")
 
     def save_image(self, link, file_path) -> None:
         try:
             request = urllib.request.Request(link, None, self.headers)
             image = urllib.request.urlopen(request, timeout=self.timeout).read()
             if not imghdr.what(None, image):
-                
                 logging.error('Invalid image, not saving %s', link)
                 raise ValueError('Invalid image, not saving %s' % link)
             with open(str(file_path), 'wb') as f:
                 f.write(image)
 
         except urllib.error.HTTPError as e:
-            self.sources-=1
             logging.error('HTTPError while saving image %s: %s', link, e)
 
         except urllib.error.URLError as e:
-            self.sources-=1
             logging.error('URLError while saving image %s: %s', link, e)
 
     def download_image(self, link):
@@ -98,9 +85,8 @@ class Bing:
             if self.verbose:
                 logging.info("[%] Downloading Image #{} from {}".format(self.download_count, link))
 
-            self.save_image(link, self.output_dir.joinpath("{}_{}.{}".format(
-                self.image_name, str(self.download_count), file_type)))
-            
+            self.save_image(link, self.output_dir.joinpath("{}_{}.{}".format(self.image_name, str(self.download_count), file_type)))
+
             if self.verbose:
                 logging.info("[%] File Downloaded !\n")
                 
@@ -137,14 +123,9 @@ class Bing:
                     logging.info("\n===============================================\n")
 
                 for link in links:
-                    isbadsite = False
-                    for badsite in self.badsites:
-                        isbadsite = badsite in link
-                        if isbadsite:
-                            if self.verbose:
-                                logging.info("[!] Link included in badsites %s %s", badsite, link)
-                            break
-                    if isbadsite:
+                    if any(badsite in link for badsite in self.badsites):
+                        if self.verbose:
+                            logging.info("[!] Link included in badsites: %s", link)
                         continue
 
                     if self.download_count < self.limit and link not in self.seen:
