@@ -44,7 +44,7 @@ async def downloader(
         bing = Bing(query, limit, image_dir, adult, timeout, filter, verbose, badsites, name)
         total_downloaded = 0
 
-        async for url in bing.get_image_urls():
+        async for url in await bing.get_image_urls():
             if total_downloaded >= limit:
                 break
             
