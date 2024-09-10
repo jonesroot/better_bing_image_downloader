@@ -1,12 +1,13 @@
 import os
 import argparse
-import shutil
 import asyncio
+import shutil
 import logging
 from pathlib import Path
 from .bing import Bing
-from tqdm.asyncio import tqdm
 import httpx
+
+
 
 async def downloader(
     query,
@@ -21,7 +22,7 @@ async def downloader(
     name='Image'
 ):
     """
-    Asynchronous downloader using httpx and tqdm for progress reporting.
+    Asynchronous downloader using httpx.
     """
 
     if adult_filter_off:
@@ -44,20 +45,19 @@ async def downloader(
         bing = Bing(query, limit, image_dir, adult, timeout, filter, verbose, badsites, name)
         total_downloaded = 0
 
-        async with tqdm(total=limit, unit='MB', ncols=100, colour="green",
-                        bar_format='{l_bar}{bar} {n_fmt}/{total_fmt} | Download Speed: {rate_fmt} | Time left: {remaining}') as pbar:
-            async for url in bing.get_image_urls():
-                try:
-                    response = await client.get(url)
-                    if response.status_code == 200:
-                        file_path = os.path.join(image_dir, f"{name}_{total_downloaded}.jpg")
-                        with open(file_path, 'wb') as f:
-                            f.write(response.content)
-                        total_downloaded += 1
-                        pbar.update(1)
-                except Exception as e:
+        async for url in bing.get_image_urls():
+            try:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    file_path = os.path.join(image_dir, f"{name}_{total_downloaded}.jpg")
+                    with open(file_path, 'wb') as f:
+                        f.write(response.content)
+                    total_downloaded += 1
                     if verbose:
-                        print(f"Failed to download {url}: {e}")
+                        print(f"Downloaded {file_path}")
+            except Exception as e:
+                if verbose:
+                    print(f"Failed to download {url}: {e}")
 
     if verbose:
         print(f"Download completed: {total_downloaded} images downloaded.")
