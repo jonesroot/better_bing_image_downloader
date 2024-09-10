@@ -43,8 +43,9 @@ async def downloader(
     async with httpx.AsyncClient(timeout=timeout) as client:
         bing = Bing(query, limit, image_dir, adult, timeout, filter, verbose, badsites, name)
         total_downloaded = 0
+        url_ = await bing.get_image_urls()
 
-        async for url in await bing.get_image_urls():
+        async for url in url_:
             if total_downloaded >= limit:
                 break
             
