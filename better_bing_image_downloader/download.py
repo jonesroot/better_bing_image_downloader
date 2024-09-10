@@ -7,8 +7,8 @@ from .bing import Bing
 from tqdm import tqdm
 from math import ceil
 
-def downloader(query, limit=100, output_dir='dataset', adult_filter_off=True,
-               force_replace=False, timeout=60, filter="", verbose=True, badsites=[], name='Image'):
+def downloader(query, limit= int, output_dir='downloads', adult_filter_off=False,
+               force_replace=False, timeout=60, filter="", verbose= str, badsites=[], name='Image'):
     """
     Download images using the Bing image scraper.
     
