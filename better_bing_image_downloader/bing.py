@@ -6,11 +6,12 @@ import posixpath
 import re
 from pathlib import Path
 
+
 class Bing:
     def __init__(self, query, limit, output_dir, adult, timeout, filter='', verbose=False, badsites=[], name='Image'):
         self.download_count = 0
         self.query = query
-        self.output_dir = Path(output_dir)  # Ensure Path object
+        self.output_dir = Path(output_dir)
         self.adult = adult
         self.filter = filter
         self.verbose = verbose
@@ -28,9 +29,9 @@ class Bing:
         if self.badsites:
             logging.info("Download links will not include: %s", ', '.join(self.badsites))
 
-        assert type(limit) == int, "limit must be integer"
+        assert isinstance(limit, int), "limit must be integer"
         self.limit = limit
-        assert type(timeout) == int, "timeout must be integer"
+        assert isinstance(timeout, int), "timeout must be integer"
         self.timeout = timeout
 
         self.page_counter = 0
@@ -74,6 +75,9 @@ class Bing:
             logging.error('URLError while saving image %s: %s', link, e)
 
     def download_image(self, link):
+        if self.download_count >= self.limit:
+            return
+        
         self.download_count += 1
         try:
             path = urllib.parse.urlsplit(link).path
@@ -130,7 +134,7 @@ class Bing:
 
                     if self.download_count < self.limit and link not in self.seen:
                         self.seen.add(link)
-                        yield link  # Yield URL for async iteration
+                        self.download_image(link)
 
                 self.page_counter += 1
             except urllib.error.HTTPError as e:
