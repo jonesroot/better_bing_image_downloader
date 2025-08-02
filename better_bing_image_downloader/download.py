@@ -14,7 +14,7 @@ def downloader(query:str,
                 force_replace:bool=False, 
                 timeout:int=60, 
                 filter:str="", 
-                verbose:bool=True, 
+                verbose:bool=False, 
                 badsites:list=[], 
                 name:str='Image', max_workers:int=4) -> int:
     """
@@ -78,16 +78,16 @@ def downloader(query:str,
         bing.download_callback = update_progress_bar  # type: ignore
         bing.run()
 
-    # After download completes, offer to show sources
-    if input('\nDo you wish to see the image sources? (Y/N): ').lower() == 'y':
+    if verbose:
+        print('\nImage sources:')
         if bing.seen:
             for i, src in enumerate(bing.seen, 1):
                 print(f'{i}. {src}')
         else:
             print("No image sources were found.")
     else:
-        print('Happy Scraping!')
-    
+        print('Download completed. Happy scraping!')
+
     return bing.download_count
 
 
